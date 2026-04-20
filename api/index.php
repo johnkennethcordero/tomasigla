@@ -17,6 +17,12 @@ require_once __DIR__ . "/db.php";
 
 $action = $_GET['action'] ?? '';
 
+// Helper to clean decimal values
+function dec($val) {
+    $v = trim($val ?? '');
+    return ($v === '' || $v === null) ? null : (float)$v;
+}
+
 switch ($action) {
 
     // ============================================================
@@ -119,8 +125,8 @@ switch ($action) {
             $_POST['category']    ?? '',
             $_POST['description'] ?? '',
             $_POST['address']     ?? '',
-            $_POST['latitude']    ?? 0,
-            $_POST['longitude']   ?? 0,
+            dec($_POST['latitude']  ?? ''),
+            dec($_POST['longitude'] ?? ''),
             $_POST['image']       ?? '',
             $_POST['status']      ?? 'active',
         ]);
@@ -140,8 +146,8 @@ switch ($action) {
             $_POST['category']    ?? '',
             $_POST['description'] ?? '',
             $_POST['address']     ?? '',
-            $_POST['latitude']    ?? 0,
-            $_POST['longitude']   ?? 0,
+            dec($_POST['latitude']  ?? ''),
+            dec($_POST['longitude'] ?? ''),
             $_POST['image']       ?? '',
             $_POST['status']      ?? 'active',
             $_POST['id'],
@@ -193,8 +199,8 @@ switch ($action) {
             $_POST['description'] ?? '',
             $_POST['address']     ?? '',
             $_POST['contact']     ?? '',
-            $_POST['latitude']    ?? 0,
-            $_POST['longitude']   ?? 0,
+            dec($_POST['latitude']  ?? ''),
+            dec($_POST['longitude'] ?? ''),
             $_POST['image']       ?? '',
             $_POST['status']      ?? 'active',
         ]);
@@ -215,8 +221,8 @@ switch ($action) {
             $_POST['description'] ?? '',
             $_POST['address']     ?? '',
             $_POST['contact']     ?? '',
-            $_POST['latitude']    ?? 0,
-            $_POST['longitude']   ?? 0,
+            dec($_POST['latitude']  ?? ''),
+            dec($_POST['longitude'] ?? ''),
             $_POST['image']       ?? '',
             $_POST['status']      ?? 'active',
             $_POST['id'],
@@ -267,12 +273,13 @@ switch ($action) {
             INSERT INTO products (name, category, description, price, business_id, image, status)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         ");
+        $bizId = trim($_POST['business_id'] ?? '');
         $stmt->execute([
             $_POST['name']        ?? '',
             $_POST['category']    ?? '',
             $_POST['description'] ?? '',
-            $_POST['price']       ?? 0,
-            $_POST['business_id'] ?? null,
+            dec($_POST['price']   ?? '') ?? 0,
+            $bizId !== '' ? (int)$bizId : null,
             $_POST['image']       ?? '',
             $_POST['status']      ?? 'active',
         ]);
@@ -287,12 +294,13 @@ switch ($action) {
             SET name=?, category=?, description=?, price=?, business_id=?, image=?, status=?
             WHERE id=?
         ");
+        $bizId = trim($_POST['business_id'] ?? '');
         $stmt->execute([
             $_POST['name']        ?? '',
             $_POST['category']    ?? '',
             $_POST['description'] ?? '',
-            $_POST['price']       ?? 0,
-            $_POST['business_id'] ?? null,
+            dec($_POST['price']   ?? '') ?? 0,
+            $bizId !== '' ? (int)$bizId : null,
             $_POST['image']       ?? '',
             $_POST['status']      ?? 'active',
             $_POST['id'],
@@ -338,13 +346,15 @@ switch ($action) {
             INSERT INTO events (title, type, description, location, event_date, event_time, status)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         ");
+        $date = trim($_POST['event_date'] ?? '');
+        $time = trim($_POST['event_time'] ?? '');
         $stmt->execute([
             $_POST['title']       ?? '',
             $_POST['type']        ?? '',
             $_POST['description'] ?? '',
             $_POST['location']    ?? '',
-            $_POST['event_date']  ?? null,
-            $_POST['event_time']  ?? null,
+            $date !== '' ? $date : null,
+            $time !== '' ? $time : null,
             $_POST['status']      ?? 'active',
         ]);
         echo json_encode(['success' => true, 'id' => $pdo->lastInsertId()]);
@@ -358,13 +368,15 @@ switch ($action) {
             SET title=?, type=?, description=?, location=?, event_date=?, event_time=?, status=?
             WHERE id=?
         ");
+        $date = trim($_POST['event_date'] ?? '');
+        $time = trim($_POST['event_time'] ?? '');
         $stmt->execute([
             $_POST['title']       ?? '',
             $_POST['type']        ?? '',
             $_POST['description'] ?? '',
             $_POST['location']    ?? '',
-            $_POST['event_date']  ?? null,
-            $_POST['event_time']  ?? null,
+            $date !== '' ? $date : null,
+            $time !== '' ? $time : null,
             $_POST['status']      ?? 'active',
             $_POST['id'],
         ]);
@@ -386,7 +398,6 @@ switch ($action) {
     case 'chatbot':
         $message = strtolower(trim($_POST['message'] ?? ''));
 
-        // Simple keyword-based responses
         $reply = "Sorry, I didn't understand that. Try asking about spots, events, or businesses in Sto. Tomas!";
 
         if (str_contains($message, 'spot') || str_contains($message, 'tourist')) {
