@@ -708,8 +708,8 @@ table{border-collapse:collapse;width:100%}
 
 <script>
 /* ════════════════════════════════════════════ CONFIG */
-let BASE_URL = localStorage.getItem('ts_base_url') || 'http://192.168.1.100/tomasigla/';
-const API = () => BASE_URL + 'api/index.php';
+let BASE_URL = localStorage.getItem('ts_base_url') || 'https://tomasigla-production.up.railway.app/';
+const API = () => BASE_URL + 'index.php';
 
 /* ════════════════════════════════════════════ STATE */
 let allSpots=[], allBiz=[], allProd=[], allEvt=[];
@@ -1135,7 +1135,7 @@ function saveSettings(){
   if(!v.endsWith('/')) v+='/';
   BASE_URL=v;
   localStorage.setItem('ts_base_url',BASE_URL);
-  document.getElementById('cfg-display').textContent=BASE_URL+'api/index.php';
+  document.getElementById('cfg-display').textContent=BASE_URL+'index.php';
   toast('Settings saved','success');
   allSpots=[];allBiz=[];allProd=[];allEvt=[];
 }
