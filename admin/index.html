@@ -152,6 +152,16 @@
         .img-remove-btn { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,.55); color: #fff; border: none; border-radius: 50%; width: 24px; height: 24px; font-size: 14px; display: flex; align-items: center; justify-content: center; cursor: pointer; line-height: 1 }
         .img-filename { font-size: 11px; color: var(--muted); text-align: center; margin-top: 4px }
 
+        /* Multi-image upload */
+        .multi-img-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px }
+        .multi-img-item { position: relative; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); aspect-ratio: 1 }
+        .multi-img-item img { width: 100%; height: 100%; object-fit: cover }
+        .multi-img-remove { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,.6); color: #fff; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 11px; display: flex; align-items: center; justify-content: center; cursor: pointer }
+        .multi-img-add { border: 2px dashed var(--border-dark); border-radius: 8px; aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all .2s; background: var(--bg); position: relative; font-size: 11px; color: var(--muted); gap: 4px }
+        .multi-img-add:hover { border-color: var(--accent); background: var(--accent-bg); color: var(--accent) }
+        .multi-img-add input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100% }
+        .multi-img-label { font-size: 11px; color: var(--muted); margin-bottom: 4px }
+
         .confirm-modal { width: 380px }
         .confirm-icon { width: 48px; height: 48px; border-radius: 50%; background: var(--danger-bg); border: 1px solid rgba(220,38,38,.2); display: flex; align-items: center; justify-content: center; margin-bottom: 16px }
         .confirm-msg { color: var(--muted); font-size: 13px; margin-top: 6px }
@@ -467,7 +477,7 @@
             <div class="form-group"><label>Latitude</label><input type="number" step="any" id="b-lat" placeholder="14.1032" /></div>
             <div class="form-group"><label>Longitude</label><input type="number" step="any" id="b-lng" placeholder="121.1703" /></div>
             <div class="form-group full">
-                <label>Image</label>
+                <label>Main Image</label>
                 <div class="img-upload-wrap">
                     <div class="img-upload-area" id="b-img-area">
                         <input type="file" id="b-img-file" accept="image/*" onchange="handleImgUpload('b')" />
@@ -480,6 +490,13 @@
                         <button class="img-remove-btn" onclick="removeImg('b')">✕</button>
                         <div class="img-filename" id="b-img-filename"></div>
                     </div>
+                </div>
+            </div>
+            <!-- MULTIPLE IMAGES -->
+            <div class="form-group full">
+                <label>Additional Images <span style="color:var(--muted-light);text-transform:none;letter-spacing:0;font-weight:400">(up to 3 — shown as thumbnails)</span></label>
+                <div class="multi-img-grid" id="b-multi-grid">
+                    <!-- slots filled dynamically -->
                 </div>
             </div>
         </div>
@@ -583,8 +600,46 @@
     let sectionStates = { spots: '1', businesses: '1', products: '1', events: '1' };
     let maintenanceOn = false;
 
-    // Store base64 images per prefix
     const imgData = {};
+
+    // ── MULTI IMAGE STATE ──
+    let bizExtraImages = []; // array of up to 3 base64/url strings
+
+    function renderBizMultiGrid() {
+        const grid = document.getElementById('b-multi-grid');
+        grid.innerHTML = '';
+        bizExtraImages.forEach((src, i) => {
+            const item = document.createElement('div');
+            item.className = 'multi-img-item';
+            item.innerHTML = `<img src="${src}" /><button class="multi-img-remove" onclick="removeBizExtra(${i})">✕</button>`;
+            grid.appendChild(item);
+        });
+        if (bizExtraImages.length < 3) {
+            const add = document.createElement('div');
+            add.className = 'multi-img-add';
+            add.innerHTML = `
+                <input type="file" accept="image/*" onchange="addBizExtra(this)" />
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" d="M12 4v16m8-8H4"/></svg>
+                <span>Add image</span>`;
+            grid.appendChild(add);
+        }
+    }
+
+    function addBizExtra(input) {
+        const file = input.files[0];
+        if (!file || bizExtraImages.length >= 3) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            bizExtraImages.push(e.target.result);
+            renderBizMultiGrid();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function removeBizExtra(i) {
+        bizExtraImages.splice(i, 1);
+        renderBizMultiGrid();
+    }
 
     /* IMAGE UPLOAD */
     function handleImgUpload(prefix) {
@@ -783,16 +838,33 @@
         document.getElementById('b-lng').value = b?.longitude||'';
         document.getElementById('b-status').value = b?.status||'active';
         resetImgUpload('b', b?.image||'');
+        // Load existing extra images
+        bizExtraImages = (b?.images && Array.isArray(b.images)) ? [...b.images] : [];
+        renderBizMultiGrid();
         openModal('biz-modal');
     }
     function editBiz(b) { openBizModal(b) }
     async function saveBiz() {
         const id = document.getElementById('biz-id').value;
-        const data = { name:document.getElementById('b-name').value, category:document.getElementById('b-cat').value, description:document.getElementById('b-desc').value, address:document.getElementById('b-addr').value, contact:document.getElementById('b-contact').value, latitude:document.getElementById('b-lat').value, longitude:document.getElementById('b-lng').value, image:imgData['b']||'', status:document.getElementById('b-status').value };
+        const data = {
+            name: document.getElementById('b-name').value,
+            category: document.getElementById('b-cat').value,
+            description: document.getElementById('b-desc').value,
+            address: document.getElementById('b-addr').value,
+            contact: document.getElementById('b-contact').value,
+            latitude: document.getElementById('b-lat').value,
+            longitude: document.getElementById('b-lng').value,
+            image: imgData['b']||'',
+            images: JSON.stringify(bizExtraImages),
+            status: document.getElementById('b-status').value
+        };
         if (!data.name) { toast('Name is required','error'); return }
         if (id) data.id = id;
-        try { const r = await apiPost(id?'update_business':'add_business', data); if (r.success!==false) { closeModal('biz-modal'); toast((id?'Updated':'Added')+' business','success'); allBiz=[]; loadBiz(); } else toast(r.message||'Error','error'); }
-        catch { toast('Cannot connect to server','error') }
+        try {
+            const r = await apiPost(id?'update_business':'add_business', data);
+            if (r.success!==false) { closeModal('biz-modal'); toast((id?'Updated':'Added')+' business','success'); allBiz=[]; loadBiz(); }
+            else toast(r.message||'Error','error');
+        } catch { toast('Cannot connect to server','error') }
     }
 
     /* PRODUCTS */
@@ -999,7 +1071,7 @@
     }
 
     function sampleSpots() { return [{id:1,name:'Calaruega Church',category:'Historical',address:'Nasugbu, Batangas',description:'Famous hillside chapel.',image:'',latitude:14.02,longitude:120.68,status:'active'}] }
-    function sampleBiz() { return [{id:1,name:'Sto. Tomas Delicacies',category:'Shop',address:'Maharlika Hwy',contact:'+63 912 345 6789',description:'Local food.',image:'',latitude:14.10,longitude:121.17,status:'active'}] }
+    function sampleBiz() { return [{id:1,name:'Sto. Tomas Delicacies',category:'Shop',address:'Maharlika Hwy',contact:'+63 912 345 6789',description:'Local food.',image:'',images:[],latitude:14.10,longitude:121.17,status:'active'}] }
     function sampleProd() { return [{id:1,name:'Barako Coffee',category:'Food',description:'Local beans.',price:180,business_id:1,business_name:'Sto. Tomas Delicacies',image:'',status:'active'}] }
     function sampleEvt() { return [{id:1,title:'Pahiyas ng Sto. Tomas',type:'Festival',location:'Sto. Tomas Church',description:'Harvest festival.',event_date:'2026-05-15',event_time:'09:00',status:'active'}] }
 </script>
