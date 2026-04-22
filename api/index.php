@@ -26,24 +26,17 @@ function dec($val) {
     return ($v === '' || $v === null) ? null : (float)$v;
 }
 
-/**
- * If $value looks like a base64 data URI (from the file upload widget),
- * decode and save it to /uploads/, return the public URL.
- * Otherwise return $value as-is (already a URL or empty).
- */
 function handleImage($value) {
     if (empty($value)) return '';
 
-    // Already a plain URL (http/https) — keep it
     if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
         return $value;
     }
 
-    // Base64 data URI — save to disk
     if (preg_match('/^data:(image\/\w+);base64,(.+)$/s', $value, $m)) {
-        $mime      = $m[1];                         // e.g. image/jpeg
+        $mime      = $m[1];
         $data      = base64_decode($m[2]);
-        $ext       = str_replace('image/', '', $mime); // jpeg / png / webp
+        $ext       = str_replace('image/', '', $mime);
         $ext       = ($ext === 'jpeg') ? 'jpg' : $ext;
         $filename  = uniqid('img_', true) . '.' . $ext;
         $uploadDir = __DIR__ . '/uploads/';
@@ -54,17 +47,16 @@ function handleImage($value) {
 
         file_put_contents($uploadDir . $filename, $data);
 
-        // Build public URL based on current host
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
         return $scheme . '://' . $host . '/uploads/' . $filename;
     }
 
-    return $value; // fallback
+    return $value;
 }
 
 // ============================================================
-// SETTINGS — ensure table exists (run once, safe to repeat)
+// SETTINGS — ensure table exists
 // ============================================================
 $pdo->exec("
     CREATE TABLE IF NOT EXISTS app_settings (
@@ -160,7 +152,6 @@ switch ($action) {
             $params[] = $category;
         }
 
-        // Mobile app gets only active; admin panel gets all
         if (!$adminMode) {
             $sql .= " AND status = 'active'";
         }
@@ -242,15 +233,26 @@ switch ($action) {
         $sql .= " ORDER BY created_at DESC";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
+        $rows = $stmt->fetchAll();
 
-        echo json_encode(['success' => true, 'data' => $stmt->fetchAll()]);
+        // Parse images JSON string into array
+        foreach ($rows as &$row) {
+            $row['images'] = !empty($row['images']) ? json_decode($row['images'], true) : [];
+        }
+
+        echo json_encode(['success' => true, 'data' => $rows]);
         break;
 
     case 'add_business':
-        $img  = handleImage($_POST['image'] ?? '');
+        $img       = handleImage($_POST['image'] ?? '');
+        $extraImgs = $_POST['images'] ?? '[]';
+        $imgsArr   = json_decode($extraImgs, true) ?? [];
+        $imgsArr   = array_map('handleImage', $imgsArr);
+        $imgsJson  = json_encode(array_values(array_filter($imgsArr)));
+
         $stmt = $pdo->prepare("
-            INSERT INTO businesses (name, category, description, address, contact, latitude, longitude, image, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO businesses (name, category, description, address, contact, latitude, longitude, image, images, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $_POST['name']        ?? '',
@@ -261,16 +263,22 @@ switch ($action) {
             dec($_POST['latitude']  ?? ''),
             dec($_POST['longitude'] ?? ''),
             $img,
+            $imgsJson,
             $_POST['status']      ?? 'active',
         ]);
         echo json_encode(['success' => true, 'id' => $pdo->lastInsertId()]);
         break;
 
     case 'update_business':
-        $img  = handleImage($_POST['image'] ?? '');
+        $img       = handleImage($_POST['image'] ?? '');
+        $extraImgs = $_POST['images'] ?? '[]';
+        $imgsArr   = json_decode($extraImgs, true) ?? [];
+        $imgsArr   = array_map('handleImage', $imgsArr);
+        $imgsJson  = json_encode(array_values(array_filter($imgsArr)));
+
         $stmt = $pdo->prepare("
             UPDATE businesses
-            SET name=?, category=?, description=?, address=?, contact=?, latitude=?, longitude=?, image=?, status=?
+            SET name=?, category=?, description=?, address=?, contact=?, latitude=?, longitude=?, image=?, images=?, status=?
             WHERE id=?
         ");
         $stmt->execute([
@@ -282,6 +290,7 @@ switch ($action) {
             dec($_POST['latitude']  ?? ''),
             dec($_POST['longitude'] ?? ''),
             $img,
+            $imgsJson,
             $_POST['status']      ?? 'active',
             $_POST['id'],
         ]);
